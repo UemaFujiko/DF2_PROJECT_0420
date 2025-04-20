@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from supabase import create_client
 import openai
 from datetime import datetime
+import os
 
 # --- ページ設定 ---
 st.set_page_config(page_title="財務データ統合アプリ", layout="wide")
@@ -19,12 +20,12 @@ page = st.sidebar.radio(
 # --- Supabase 接続 ---
 @st.cache_resource
 def init_supabase():
-    url = st.secrets["supabase"]["url"]
-    key = st.secrets["supabase"]["key"]
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
     return create_client(url, key)
 
 supabase = init_supabase()
-openai.api_key = st.secrets["openai"]["api_key"]
+openai.api_key = os.environ.get("API_KEY")
 
 # --- 固定設定 ---
 table_name = "monthly_pl"
