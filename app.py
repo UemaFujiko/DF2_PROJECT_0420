@@ -232,3 +232,74 @@ elif page == "🧮 ローカルCSVダッシュボード":
             st.warning("⚠️ 人件費列が見つかりません。労働生産性・労働分配率は計算されません。")
 
         st.dataframe(df_summary[[ "月", "限界利益率", "売上高経常利益率", "損益分岐点比率", "生産性", "労働生産性", "労働分配率" ]])
+
+ # 利益構造ツリーマップ
+        st.subheader("🧩 月次の利益構造（PLツリーマップ）")
+
+        latest_month = df_summary["月"].iloc[-1]
+        selected_month = st.selectbox("表示する月を選んでください", df_summary["月"].unique(), index=len(df_summary)-1, key="month_selector_main")
+        df_selected = df_summary[df_summary["月"] == selected_month].iloc[0]
+
+        labels = ["売上高", "変動費", "固定費", "粗利益", "経常利益"]
+        values = [
+            df_selected["売上高"],
+            df_selected["変動費"],
+            df_selected["固定費"],
+            df_selected["粗利益"],
+            df_selected["経常利益"]
+        ]
+        parents = ["", "売上高", "粗利益", "売上高", "粗利益"]
+
+        fig = px.treemap(
+            names=labels,
+            values=values,
+            parents=parents,
+            title=f"{selected_month} の利益構造"
+        )
+        fig.update_traces(root_color="lightgrey")
+        fig.update_layout(margin=dict(t=50, l=25, r=25, b=25))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # 前月・前年同月比較
+        st.subheader("📊 利益構造の比較（図表3風）")
+
+        all_months = df_summary["月"].tolist()
+        current_index = all_months.index(selected_month)
+        prev_month = all_months[current_index - 1] if current_index > 0 else None
+        prev_year = f"{int(selected_month[:4]) - 1}-{selected_month[5:]}"
+        prev_year = prev_year if prev_year in df_summary["月"].values else None
+
+        def show_comparison(before_month, after_month, label):
+            if not before_month or not after_month:
+                st.info(f"{label}比較できるデータがありません")
+                return
+
+            before = df_summary[df_summary["月"] == before_month].iloc[0]
+            after = df_summary[df_summary["月"] == after_month].iloc[0]
+
+            delta = after["経常利益"] - before["経常利益"]
+            ratio = (delta / before["経常利益"]) * 100 if before["経常利益"] != 0 else 0
+
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=["売上高", "変動費", "固定費", "粗利益", "経常利益"],
+                y=[before["売上高"]/1_000_000, before["変動費"]/1_000_000, before["固定費"]/1_000_000, before["粗利益"]/1_000_000, before["経常利益"]/1_000_000],
+                name=f"{before_month}", marker_color='lightgray'
+            ))
+            fig.add_trace(go.Bar(
+                x=["売上高", "変動費", "固定費", "粗利益", "経常利益"],
+                y=[after["売上高"]/1_000_000, after["変動費"]/1_000_000, after["固定費"]/1_000_000, after["粗利益"]/1_000_000, after["経常利益"]/1_000_000],
+                name=f"{after_month}", marker_color='teal'
+            ))
+            fig.update_layout(
+                title=f"{label}比較: {before_month} → {after_month}（経常利益差: {delta/1_000_000:.1f}百万円, {ratio:.1f}%）",
+                barmode="group",
+                yaxis_title="金額（百万円）",
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        show_comparison(prev_month, selected_month, "前月")
+        show_comparison(prev_year, selected_month, "前年同月")
+    else:
+        st.info('📥 CSVをアップロードすると利益構造が表示されます')
