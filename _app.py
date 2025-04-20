@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from supabase import create_client
-from openai import OpenAI
+import openai
 from datetime import datetime
 import os
 
@@ -27,7 +27,7 @@ def init_supabase():
     return create_client(url, key)
 
 supabase = init_supabase()
-client = OpenAI(api_key=os.environ.get("API_KEY"))
+openai.api_key = os.environ.get("API_KEY")
 
 # --- 固定設定 ---
 table_name = "monthly_pl"
@@ -38,7 +38,7 @@ SALES_COLUMN = "sales"
 def generate_sales_advice(df: pd.DataFrame, sales_col: str):
     if df.empty:
         return "データが存在しないため、分析できません。"
-
+    
     csv_data = df[['year_month', sales_col]].to_csv(index=False)
     prompt = f"""
 あなたは財務分析の専門家です。
@@ -49,11 +49,9 @@ def generate_sales_advice(df: pd.DataFrame, sales_col: str):
 {csv_data}
 """
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=500
         )
@@ -90,9 +88,8 @@ def process_data(df):
         st.error(f"❌ データ処理エラー: {e}")
         return pd.DataFrame()
 
-# --- アプリ機能別の表示処理（元の300行規模に復元） ---
 
-# 📤 Supabaseアップロードページ
+# === 📤 Supabaseアップロード ===
 if page == "📤 Supabaseアップロード":
     st.title("📤 財務データのSupabaseアップロード")
 
@@ -128,7 +125,8 @@ if page == "📤 Supabaseアップロード":
                 st.error("❌ Supabase保存中のエラー:")
                 st.code(str(e), language="json")
 
-# 📈 Supabase可視化ページ
+
+# === 📈 Supabase可視化 ===
 elif page == "📈 Supabase可視化":
     st.title("📈 Supabase上の売上データ可視化")
 
@@ -163,10 +161,12 @@ elif page == "📈 Supabase可視化":
                 advice = generate_sales_advice(df_processed, SALES_COLUMN)
                 st.success("✅ 分析コメント:")
                 st.markdown(advice)
+
     else:
         st.info("📭 Supabase テーブル `monthly_pl` に保存されたデータがまだありません。")
 
-# 🧮 ローカルCSVダッシュボードページ
+
+# === 🧮 ローカルCSVダッシュボード ===
 elif page == "🧮 ローカルCSVダッシュボード":
     st.title("🧮 月次 財務データダッシュボード（ローカルCSV）")
 
@@ -233,6 +233,7 @@ elif page == "🧮 ローカルCSVダッシュボード":
 
         st.dataframe(df_summary[[ "月", "限界利益率", "売上高経常利益率", "損益分岐点比率", "生産性", "労働生産性", "労働分配率" ]])
 
+        # 利益構造ツリーマップ
         st.subheader("🧩 月次の利益構造（PLツリーマップ）")
 
         latest_month = df_summary["月"].iloc[-1]
@@ -259,6 +260,7 @@ elif page == "🧮 ローカルCSVダッシュボード":
         fig.update_layout(margin=dict(t=50, l=25, r=25, b=25))
         st.plotly_chart(fig, use_container_width=True)
 
+        # 前月・前年同月比較
         st.subheader("📊 利益構造の比較（図表3風）")
 
         all_months = df_summary["月"].tolist()
