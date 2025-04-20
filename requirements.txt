@@ -2,4 +2,4 @@ streamlit
 pandas
 plotly
 supabase
-openai
+openai==0.28
